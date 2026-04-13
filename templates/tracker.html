@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+{% block title %}Weekly Tracker{% endblock %}
+
+{% block content %}
+<style>
+    /* Reset body flex and overflow for scrollability in dashboard */
+    body {
+        align-items: flex-start !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding: 40px 0; /* Add some padding so it doesn't touch the very top/bottom */
+    }
+
+    /* Expand the container for the tracker view */
+    .container {
+        max-width: 1200px !important;
+        margin: 40px auto;
+    }
+    
+    .glass-panel {
+        padding: 30px !important;
+    }
+
+    /* Tracker Layout */
+    .dashboard-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .dashboard-header h2 {
+        font-size: 32px;
+        font-weight: 700;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        margin-bottom: 10px;
+    }
+
+    .dashboard-header p {
+        color: var(--text-secondary);
+        font-size: 16px;
+    }
+
+    .chart-container {
+        max-width: 800px;
+        margin: 0 auto 40px;
+        padding: 20px;
+        background: rgba(15, 17, 26, 0.4);
+        border-radius: 16px;
+        border: 1px solid var(--glass-border);
+    }
+
+    .days-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .day-card {
+        background: rgba(15, 17, 26, 0.5);
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid var(--glass-border);
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .day-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        border-color: rgba(139, 92, 246, 0.3);
+    }
+
+    .day-card h3 {
+        color: var(--text-primary);
+        font-size: 18px;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--glass-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .task-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* Custom Checkbox Style */
+    .task-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+    }
+
+    .task-item input[type="checkbox"] {
+        display: none;
+    }
+
+    .custom-checkbox {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        border: 2px solid var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .custom-checkbox i {
+        color: white;
+        font-size: 16px;
+        opacity: 0;
+        transform: scale(0.5);
+        transition: all 0.2s;
+        font-weight: bold;
+    }
+
+    .task-item input[type="checkbox"]:checked + .custom-checkbox {
+        background: var(--primary-gradient);
+        border-color: transparent;
+        box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+    }
+
+    .task-item input[type="checkbox"]:checked + .custom-checkbox i {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    .task-text {
+        color: var(--text-primary);
+        font-size: 15px;
+        transition: color 0.2s, text-decoration 0.2s;
+    }
+
+    .task-item input[type="checkbox"]:checked ~ .task-text {
+        color: var(--text-secondary);
+        text-decoration: line-through;
+    }
+
+    /* Add Task Input */
+    .add-task-container {
+        margin-top: 15px;
+    }
+    
+    .add-task-input {
+        width: 100%;
+        background: rgba(148, 163, 184, 0.05);
+        border: 1px dashed var(--glass-border);
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: var(--text-primary);
+        font-family: inherit;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.3s;
+    }
+
+    .add-task-input::placeholder {
+        color: rgba(148, 163, 184, 0.5);
+    }
+
+    .add-task-input:focus {
+        border-color: var(--blob-purple);
+        background: rgba(148, 163, 184, 0.1);
+    }
+</style>
+
+<div class="dashboard-header stagger-1">
+    <h2>Weekly Habit Progress</h2>
+    <p>Track your tasks and watch your progress grow.</p>
+</div>
+
+<!-- Chart Section -->
+<div class="chart-container stagger-2">
+    <canvas id="progressChart" height="100"></canvas>
+</div>
+
+<!-- Days Grid Section -->
+<div class="days-grid stagger-3">
+    {% for day, tasks in tasks_data.items() %}
+    <div class="day-card">
+        <h3>
+            {{ day }}
+            <i class="ph ph-calendar-check" style="color: var(--blob-cyan);"></i>
+        </h3>
+        <div class="task-list" id="list-{{ day }}">
+            {% for task in tasks %}
+            <label class="task-item">
+                <input type="checkbox" 
+                       data-task-id="{{ task.id }}" 
+                       data-day="{{ day }}"
+                       class="task-toggle"
+                       {% if task.done %}checked{% endif %}>
+                <div class="custom-checkbox">
+                    <i class="ph ph-check-bold"></i>
+                </div>
+                <span class="task-text">{{ task.name }}</span>
+            </label>
+            {% endfor %}
+        </div>
+        <div class="add-task-container">
+            <input type="text" 
+                   class="add-task-input" 
+                   data-day="{{ day }}" 
+                   placeholder="+ New task (press Enter)">
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const checkboxes = document.querySelectorAll('.task-toggle');
+        const ctx = document.getElementById('progressChart').getContext('2d');
+        let progressChart;
+
+        // Gradient for chart
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(139, 92, 246, 0.8)');
+        gradient.addColorStop(1, 'rgba(6, 182, 212, 0.2)');
+
+        const initChart = (labels, data) => {
+            if (progressChart) {
+                progressChart.destroy();
+            }
+            
+            progressChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Completion Progress (%)',
+                        data: data,
+                        backgroundColor: gradient,
+                        borderColor: '#8b5cf6',
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        barThickness: 30
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                color: '#94a3b8'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#94a3b8'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+        // Initial fetch to get correct chart stats
+        fetch('/api/toggle_task', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ }) // send empty just to get data back
+        })
+        .then(res => res.json())
+        .then(data => {
+            initChart(data.days, data.completion_rates);
+        });
+
+        // Event listener for checkbox toggle using event delegation!
+        document.querySelector('.days-grid').addEventListener('change', (e) => {
+            if (e.target.classList.contains('task-toggle')) {
+                const taskId = e.target.dataset.taskId;
+                const day = e.target.dataset.day;
+                const isDone = e.target.checked;
+
+                fetch('/api/toggle_task', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        task_id: taskId,
+                        day: day,
+                        is_done: isDone
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        progressChart.data.datasets[0].data = data.completion_rates;
+                        progressChart.update();
+                    }
+                });
+            }
+        });
+
+        // Event listener for adding new tasks
+        const addInputs = document.querySelectorAll('.add-task-input');
+        addInputs.forEach(input => {
+            input.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const taskName = this.value.trim();
+                    const day = this.dataset.day;
+                    
+                    if (!taskName) return;
+                    
+                    // Disable while submitting
+                    this.disabled = true;
+
+                    fetch('/api/add_task', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            day: day,
+                            task_name: taskName
+                        })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        this.disabled = false;
+                        if (data.status === 'success') {
+                            this.value = '';
+                            
+                            // Build new HTML for task
+                            const taskObj = data.task;
+                            const newHtml = `
+                                <label class="task-item">
+                                    <input type="checkbox" 
+                                           data-task-id="${taskObj.id}" 
+                                           data-day="${day}"
+                                           class="task-toggle">
+                                    <div class="custom-checkbox">
+                                        <i class="ph ph-check-bold"></i>
+                                    </div>
+                                    <span class="task-text">${taskObj.name}</span>
+                                </label>
+                            `;
+                            
+                            // Remove placeholder empty text if there was one
+                            const listDiv = document.getElementById('list-' + day);
+                            const pEmpty = listDiv.querySelector('p');
+                            if (pEmpty) pEmpty.remove();
+                            
+                            listDiv.insertAdjacentHTML('beforeend', newHtml);
+                            
+                            // Update graph
+                            progressChart.data.datasets[0].data = data.completion_rates;
+                            progressChart.update();
+                        }
+                    })
+                    .catch(e => { console.error('Error adding task:', e); this.disabled = false; });
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
